@@ -1,0 +1,20 @@
+name = "Champernowne"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["Champernowne", "CountExtras"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+autoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
+[[lean_lib]]
+name = "Champernowne"
+
+# Goal 2 mini-library remainder, NOT required for champernowne_normal;
+# imported only by Sandbox.lean.
+[[lean_lib]]
+name = "CountExtras"
