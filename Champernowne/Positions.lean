@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Arthur Champernowne
 -/
 import Champernowne.DigitCount
+import Champernowne.Prefix
 
 /-!
 # Position arithmetic & prefix decomposition (PLAN.md Goal 4)

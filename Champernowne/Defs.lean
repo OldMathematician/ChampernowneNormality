@@ -15,6 +15,11 @@ produced by `Nat.digits`; all Champernowne-facing code is big-endian via
 `bigDigits`. The primary object is the finite prefix `champBlocks b N`;
 the infinite sequence `champDigit b` is derived from it (prefixes-first
 architecture, CLAUDE.md rule 3).
+
+This file is exactly the closure needed to *state* `champernowne_normal`
+(`champDigit`, `IsNormalSequence`, and their dependencies) — nothing
+here is proof-only machinery. The `champPrefix` coherence API used by
+the proof itself lives in `Prefix.lean`.
 -/
 
 /-- Big-endian digits of `n` in base `b`. -/
@@ -23,12 +28,6 @@ def bigDigits (b n : ℕ) : List ℕ := (Nat.digits b n).reverse
 /-- First `N` blocks of the base-`b` Champernowne sequence: digits of 1..N. -/
 def champBlocks (b N : ℕ) : List ℕ :=
   ((List.range N).map fun n => bigDigits b (n + 1)).flatten
-
-theorem champBlocks_prefix {b N M : ℕ} (h : N ≤ M) :
-    champBlocks b N <+: champBlocks b M := by
-  obtain ⟨k, rfl⟩ := Nat.exists_eq_add_of_le h
-  simp only [champBlocks, List.range_add, List.map_append, List.flatten_append]
-  exact List.prefix_append _ _
 
 theorem champBlocks_succ (b N : ℕ) :
     champBlocks b (N + 1) = champBlocks b N ++ bigDigits b (N + 1) := by
@@ -49,34 +48,6 @@ theorem le_length_champBlocks (b N : ℕ) : N ≤ (champBlocks b N).length := by
 def champDigit (b i : ℕ) : ℕ :=
   (champBlocks b (i + 1))[i]'(lt_of_lt_of_le (Nat.lt_succ_self i)
     (le_length_champBlocks b (i + 1)))
-
-/-- Coherence: any sufficiently long prefix computes `champDigit`. -/
-theorem champBlocks_getElem (b N i : ℕ) (h : i < (champBlocks b N).length) :
-    (champBlocks b N)[i] = champDigit b i := by
-  simp only [champDigit]
-  rcases le_total N (i + 1) with hN | hN
-  · exact (champBlocks_prefix hN).getElem h
-  · exact ((champBlocks_prefix hN).getElem (lt_of_lt_of_le (Nat.lt_succ_self i)
-      (le_length_champBlocks b (i + 1)))).symm
-
-/-- The first `n` digits of the base-`b` Champernowne sequence. -/
-def champPrefix (b n : ℕ) : List ℕ := (champBlocks b n).take n
-
-theorem length_champPrefix (b n : ℕ) : (champPrefix b n).length = n := by
-  rw [champPrefix, List.length_take]
-  exact Nat.min_eq_left (le_length_champBlocks b n)
-
-theorem champPrefix_eq_map (b n : ℕ) :
-    champPrefix b n = (List.range n).map (champDigit b) := by
-  have hlen := length_champPrefix b n
-  apply List.ext_getElem
-  · rw [hlen, List.length_map, List.length_range]
-  · intro i h1 h2
-    have hi : i < (champBlocks b n).length := by
-      rw [hlen] at h1
-      exact lt_of_lt_of_le h1 (le_length_champBlocks b n)
-    simp only [champPrefix, List.getElem_take, List.getElem_map, List.getElem_range]
-    exact champBlocks_getElem b n i hi
 
 /-- Number of (overlapping) occurrences of `w` as a contiguous block of `l`.
 
