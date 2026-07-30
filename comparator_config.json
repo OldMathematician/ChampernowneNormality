@@ -1,0 +1,7 @@
+{
+    "challenge_module": "Champernowne.Challenge",
+    "solution_module": "Champernowne.Solution",
+    "theorem_names": ["champernowne_normal"],
+    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+    "enable_nanoda": false
+}

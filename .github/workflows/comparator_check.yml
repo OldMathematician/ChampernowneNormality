@@ -1,0 +1,73 @@
+name: Comparator check for champernowne_normal
+
+# Builds leanprover/comparator and independently verifies that
+# Champernowne/Solution.lean proves exactly the statement declared (with
+# `sorry`) in Champernowne/Challenge.lean, using only the permitted axioms
+# in comparator_config.json.
+#
+# Manual-only (workflow_dispatch), not on every push: this check is our
+# own to run when we choose (e.g. before asking for review), and it's a
+# meaningfully heavier CI job than the standard build — running it on
+# every push would be an unnecessary resource draw on shared runners.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run_comparator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+
+      - name: Checkout comparator
+        uses: actions/checkout@v4
+        with:
+          repository: leanprover/comparator
+          path: comparator
+
+      # comparator/lean4export pin their own dev toolchain (v4.33.0-rc1),
+      # but lean4export must read .olean files our project's toolchain
+      # (v4.32.0-rc1) produces — olean is a version-specific binary format,
+      # so the reader has to match the writer or it can't open the file at
+      # all. This follows comparator's own README requirement: lean4export
+      # "at a version compatible with whatever Lean version your project is
+      # targeting". Lake resolves the toolchain for the whole build from
+      # the root package (comparator here), so overwriting only this one
+      # file is sufficient to cover its lean4export dependency too.
+      - name: Pin comparator/lean4export to our project's toolchain
+        run: cp lean-toolchain comparator/lean-toolchain
+
+      - name: Build lean4export and comparator
+        working-directory: comparator
+        run: lake build lean4export comparator
+
+      # Real landrun v0.1.14 (released, not HEAD — HEAD hit a separate
+      # bug stripping the `--` argument lean4export's CLI needs). Wrapped
+      # to grant --rox on the dynamic loader's usual locations, per
+      # kim-em/erdos-unit-distance-comparator's verify.sh: landrun's
+      # `-ldd` auto-detection can miss the ELF interpreter itself, and
+      # "without execute permission on the interpreter, every execve
+      # inside the sandbox fails with EACCES" — exactly the "permission
+      # denied" failure this fixes. Confirmed working: real Landlock
+      # sandboxing applied successfully for every build/export step.
+      - name: Download landrun v0.1.14 and wrap it with loader paths
+        run: |
+          curl -sL -o landrun-bin \
+            https://github.com/Zouuup/landrun/releases/download/v0.1.14/landrun-linux-amd64
+          chmod +x landrun-bin
+          EXTRA=""
+          for d in /lib64 /lib /usr/lib; do
+            [ -e "$d" ] && EXTRA="$EXTRA --rox $d"
+          done
+          printf '#!/usr/bin/env bash\nexec "%s/landrun-bin"%s "$@"\n' "$(pwd)" "$EXTRA" > landrun
+          chmod +x landrun
+          cat landrun
+
+      - name: Run comparator against champernowne_normal
+        env:
+          LANDRUN_LOG_LEVEL: debug
+        run: |
+          COMPARATOR_LANDRUN="$(realpath landrun)" \
+          COMPARATOR_LEAN4EXPORT="$(realpath comparator/.lake/packages/lean4export/.lake/build/bin/lean4export)" \
+          lake env "$(realpath comparator/.lake/build/bin/comparator)" comparator_config.json
